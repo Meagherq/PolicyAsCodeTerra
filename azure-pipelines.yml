@@ -1,0 +1,224 @@
+trigger:
+- 'main'
+
+variables:
+  buildConfiguration: 'Release'
+  releaseBranchName: 'release'
+
+stages:
+- stage: 'Build'
+  displayName: 'Build the TF app'
+  jobs: 
+  - job: 'Build'
+    displayName: 'Build job'
+    pool:
+      vmImage: 'ubuntu-20.04'
+
+    steps:
+    - publish: '$(System.DefaultWorkingDirectory)'
+      artifact: drop
+
+- stage: 'DevPlan'
+  displayName: 'Dev Environment Plan'
+  jobs:
+  - deployment: 'DevPlan'
+    displayName: 'Dev Environment Plan'
+    pool:
+      vmImage: 'ubuntu-20.04'
+    environment: 'none'
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+         - download: current
+           artifact: drop
+         - task: CopyFiles@2
+           displayName: 'Copy Terraform Files'
+           inputs:
+             SourceFolder: '$(Pipeline.Workspace)/drop'
+             TargetFolder: '$(System.DefaultWorkingDirectory)/env/dev'
+         - script: 'printf ''terraform {  \nbackend "azurerm" {  \nstorage_account_name="tfprereq" \ncontainer_name="tfstate" \nkey="dev.terraform.tfstate" \nresource_group_name="tfprereq" \naccess_key="$(StorageAccessKey)"\n}\n}'' > $(System.DefaultWorkingDirectory)/evironments/dev/backend.tf'
+           displayName: 'Setup Backend Config'
+         - task: Docker@1
+           displayName: 'Terraform Init'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'init -no-color'
+             runInBackground: false
+         - task: Docker@1
+           displayName: 'Terraform Plan'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'plan -out=output'
+             runInBackground: false
+- stage: 'DeployDev'
+  displayName: 'Deploy Dev Environment'
+  jobs:
+  - deployment: 'DevDeploy'
+    displayName: 'Dev Deploy'
+    pool:
+      vmImage: 'ubuntu-20.04'
+    environment: 'Dev'
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+         - download: current
+           artifact: drop
+         - task: CopyFiles@2
+           displayName: 'Copy Terraform Files'
+           inputs:
+             SourceFolder: '$(Pipeline.Workspace)/drop'
+             TargetFolder: '$(System.DefaultWorkingDirectory)/env/dev'
+         - script: 'printf ''terraform {  \nbackend "azurerm" {  \nstorage_account_name="tfprereq" \ncontainer_name="tfstate" \nkey="dev.terraform.tfstate" \nresource_group_name="tfprereq" \naccess_key="$(StorageAccessKey)"\n}\n}'' > $(System.DefaultWorkingDirectory)/evironments/dev/backend.tf'
+           displayName: 'Setup Backend Config'
+         - task: Docker@1
+           displayName: 'Terraform Init'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'init -no-color'
+             runInBackground: false
+         - task: Docker@1
+           displayName: 'Terraform Apply'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'apply -auto-approve -no-color'
+             runInBackground: false
+- stage: 'ProdPlan'
+  displayName: 'Prod Environment Plan'
+  jobs:
+  - deployment: 'ProdPlan'
+    displayName: 'Prod Environment Plan'
+    pool:
+      vmImage: 'ubuntu-20.04'
+    environment: 'none'
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+         - download: current
+           artifact: drop
+         - task: CopyFiles@2
+           displayName: 'Copy Terraform Files'
+           inputs:
+             SourceFolder: '$(Pipeline.Workspace)/drop'
+             TargetFolder: '$(System.DefaultWorkingDirectory)/env/dev'
+         - script: 'printf ''terraform {  \nbackend "azurerm" {  \nstorage_account_name="tfprereq" \ncontainer_name="tfstate" \nkey="dev.terraform.tfstate" \nresource_group_name="tfprereq" \naccess_key="$(StorageAccessKey)"\n}\n}'' > $(System.DefaultWorkingDirectory)/evironments/dev/backend.tf'
+           displayName: 'Setup Backend Config'
+         - task: Docker@1
+           displayName: 'Terraform Init'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'init -no-color'
+             runInBackground: false
+         - task: Docker@1
+           displayName: 'Terraform Plan'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'plan -out=output'
+             runInBackground: false
+- stage: 'DeployProd'
+  displayName: 'Deploy Prod Environment'
+  jobs:
+  - deployment: 'ProdDeploy'
+    displayName: 'Prod Deploy'
+    pool:
+      vmImage: 'ubuntu-20.04'
+    environment: 'Dev'
+    strategy:
+     runOnce:
+       deploy:
+         steps:
+         - download: current
+           artifact: drop
+         - task: CopyFiles@2
+           displayName: 'Copy Terraform Files'
+           inputs:
+             SourceFolder: '$(Pipeline.Workspace)/drop'
+             TargetFolder: '$(System.DefaultWorkingDirectory)/env/dev'
+         - script: 'printf ''terraform {  \nbackend "azurerm" {  \nstorage_account_name="tfprereq" \ncontainer_name="tfstate" \nkey="dev.terraform.tfstate" \nresource_group_name="tfprereq" \naccess_key="$(StorageAccessKey)"\n}\n}'' > $(System.DefaultWorkingDirectory)/evironments/dev/backend.tf'
+           displayName: 'Setup Backend Config'
+         - task: Docker@1
+           displayName: 'Terraform Init'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'init -no-color'
+             runInBackground: false
+         - task: Docker@1
+           displayName: 'Terraform Apply'
+           inputs:
+             command: 'Run an image'
+             imageName: 'hashicorp/terraform:1.5.1'
+             qualifyImageName: false
+             volumes: '$(System.DefaultWorkingDirectory):/code'
+             envVars: |
+              ARM_CLIENT_ID=$(terraform-app-id)
+              ARM_CLIENT_SECRET=$(terraform-key)
+              ARM_SUBSCRIPTION_ID=$(env-subscription-id)
+              ARM_TENANT_ID=$(tenant-id)
+             workingDirectory: '/code/env/dev'
+             containerCommand: 'apply -auto-approve -no-color'
+             runInBackground: false
