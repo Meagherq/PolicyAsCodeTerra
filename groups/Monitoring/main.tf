@@ -1,4 +1,24 @@
-resource "azurerm_policy_definition" "policy" {
+####################################
+####Built-In Monitoring Policies####
+####################################
+data azurerm_policy_definition activity_log_retention_policy {
+  display_name = "Activity log should be retained for at least one year"
+}
+output "activity_log_retention_policy" {
+  value = {
+    id = data.azurerm_policy_definition.activity_log_retention_policy.id
+    parameter_values = <<VALUE
+    {
+      "effect": {"value": "AuditIfNotExists"}
+    }
+    VALUE
+  }
+}
+
+##################################
+####Custom Monitoring Policies####
+##################################
+resource "azurerm_policy_definition" "audit_law_app_service" {
   name         = "accTestPolicy"
   policy_type  = "Custom"
   mode         = "Indexed"
@@ -8,12 +28,11 @@ resource "azurerm_policy_definition" "policy" {
     {
     "category": "General"
     }
-
-METADATA
+    METADATA
 
 
   policy_rule = <<POLICY_RULE
-{
+  {
       "if": {
         "allOf": [
           {
@@ -85,10 +104,10 @@ METADATA
         }
       }
     }
-POLICY_RULE
+  POLICY_RULE
 
   parameters = <<PARAMETERS
-{
+  {
       "effect": {
         "type": "String",
         "metadata": {
@@ -134,49 +153,15 @@ POLICY_RULE
         "defaultValue": "ebd7199b-33be-4511-b7e0-d6d015e7ae20"
       }
     }
-PARAMETERS
-
+  PARAMETERS
 }
-
-resource "azurerm_policy_definition" "policy" {
-  name         = "accTestPolicy"
-  policy_type  = "Custom"
-  mode         = "Indexed"
-  display_name = "acceptance test policy definition"
-
-  metadata = <<METADATA
+output "audit_law_app_service" {
+  value = {
+    id = azurerm_policy_definition.audit_law_app_service.id
+    parameter_values = <<VALUE
     {
-    "category": "General"
+      "logAnalytics": {"value": "[parameters('logAnalytics')]"}
     }
-
-METADATA
-
-
-  policy_rule = <<POLICY_RULE
- {
-    "if": {
-      "not": {
-        "field": "location",
-        "in": "[parameters('allowedLocations')]"
-      }
-    },
-    "then": {
-      "effect": "audit"
-    }
+    VALUE
   }
-POLICY_RULE
-
-  parameters = <<PARAMETERS
- {
-    "allowedLocations": {
-      "type": "Array",
-      "metadata": {
-        "description": "The list of allowed locations for resources.",
-        "displayName": "Allowed locations",
-        "strongType": "location"
-      }
-    }
-  }
-PARAMETERS
-
 }
